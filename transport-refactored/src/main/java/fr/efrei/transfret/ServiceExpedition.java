@@ -38,41 +38,23 @@ public class ServiceExpedition {
     private CalculateurPrix calculateur = new CalculateurPrix();
     private AffectationVehicule affectation = new AffectationVehicule();
 
+    private final EstimateurDelai estimateurDelai = new EstimateurDelai();
+    private final ValidateurExpedition validateur = new ValidateurExpedition();
+    private final Notificateur notificateur = new Notificateur();
+
     public Expedition creerExpedition(
             Client client, List<Colis> colis, String villeDepart, String villeArrivee, String mode, boolean urgent, boolean assurance)
     {
 
-        if (client == null) {
-            System.out.println("ERREUR : client obligatoire");
-            return null;
-        }
-
-        if (colis == null || colis.isEmpty()) {
-            System.out.println("ERREUR : au moins un colis est nécessaire");
-            return null;
-        }
-
-        boolean dangereux = false;
-        boolean refrigere = false;
-
-        for (Colis c : colis) {
-            if (c.getPoids() <= 0) {
-                System.out.println(
-                        "ERREUR : poids invalide pour " + c.getDescription()
-                );
+        // Préserver l'ordre historique des vérifications.
+        if (client == null || colis == null || colis.isEmpty()) {
+            if (!validateur.valider(client, colis, null, urgent)) {
                 return null;
-            }
-
-            if (c.getTypeMarchandise() == TypeMarchandise.DANGEREUX) {
-                dangereux = true;
-            }
-
-            if (c.getTypeMarchandise() == TypeMarchandise.REFRIGERE) {
-                refrigere = true;
             }
         }
 
         ModeTransport modeTransport;
+
         try {
             modeTransport = ModeTransport.valueOf(mode);
         } catch (IllegalArgumentException | NullPointerException ex) {
@@ -80,23 +62,7 @@ public class ServiceExpedition {
             return null;
         }
 
-        if (dangereux && modeTransport == ModeTransport.AIR) {
-            System.out.println("ERREUR : les matières dangereuses sont interdites en transport aérien"
-            );
-            return null;
-        }
-
-        if (refrigere
-                && modeTransport != ModeTransport.ROUTE
-                && modeTransport != ModeTransport.MER) {
-            System.out.println("ERREUR : le transport réfrigéré n'est possible que par route ou par mer"
-            );
-            return null;
-        }
-
-        if (urgent && modeTransport == ModeTransport.MER) {
-            System.out.println("ERREUR : pas d'option urgente pour le transport maritime"
-            );
+        if (!validateur.valider(client, colis, modeTransport, urgent)) {
             return null;
         }
 
@@ -154,7 +120,7 @@ public class ServiceExpedition {
 
         db.sauvegarderExpedition(e);
 
-        notifier(
+        notificateur.notifier(
                 client,
                 "Confirmation de votre expédition " + e.getId(),
                 "Votre expédition " + villeDepart + " -> "
@@ -182,60 +148,14 @@ public class ServiceExpedition {
         return Utils.arrondir(ht * TAUX_TVA);
     }
 
-    public int calculerDelai(
-            int distance,
-            String mode,
-            boolean urgent) {
-
-        int jours = 0;
-
+    public int calculerDelai(int distance, String mode, boolean urgent) {
         ModeTransport modeTransport;
         try {
             modeTransport = ModeTransport.valueOf(mode);
         } catch (IllegalArgumentException | NullPointerException ex) {
-            return DELAI_MINIMUM_JOURS;
+            return 1;
         }
-
-        switch (modeTransport) {
-
-            case ROUTE -> {
-                double heures = distance / VITESSE_ROUTE_KMH;
-
-                if (urgent) {
-                    jours = (int) Math.ceil(
-                            heures / HEURES_ROUTE_URGENT
-                    );
-                } else {
-                    jours = (int) Math.ceil(
-                            heures / HEURES_ROUTE_NORMAL
-                    );
-                }
-            }
-
-            case RAIL -> {
-                jours = (int) Math.ceil(distance / DISTANCE_RAIL_PAR_JOUR) + MARGE_RAIL_JOURS;
-
-                if (urgent) {
-                    jours--;
-                }
-            }
-
-            case MER -> jours = (int) Math.ceil(distance / DISTANCE_MER_PAR_JOUR) + MARGE_MER_JOURS;
-
-            case AIR -> {
-                jours = DELAI_AIR_COURT;
-
-                if (distance > SEUIL_AIR_LONGUE_DISTANCE_KM) {
-                    jours = DELAI_AIR_LONG;
-                }
-
-                if (urgent) {
-                    jours = DELAI_AIR_COURT;
-                }
-            }
-        }
-
-        return Math.max(jours, DELAI_MINIMUM_JOURS);
+        return estimateurDelai.estimer(distance, modeTransport, urgent);
     }
 
     public boolean demarrerExpedition(String id) {
@@ -283,7 +203,7 @@ public class ServiceExpedition {
 
         db.mettreAJourStatut(e);
 
-        notifier(e.getClient(), "Votre expédition " + e.getId() + " est en route", "Votre expédition a quitté " + e.getVilleDepart() + ".", "TransFret : expédition " + e.getId() + " partie de " + e.getVilleDepart());
+        notificateur.notifier(e.getClient(), "Votre expédition " + e.getId() + " est en route", "Votre expédition a quitté " + e.getVilleDepart() + ".", "TransFret : expédition " + e.getId() + " partie de " + e.getVilleDepart());
 
         return true;
     }
@@ -303,7 +223,7 @@ public class ServiceExpedition {
         libererVehicule(e);
         db.mettreAJourStatut(e);
 
-        notifier(e.getClient(), "Votre expédition " + e.getId() + " est livrée", "Votre expédition est arrivée à " + e.getVilleArrivee() + ". Merci de votre confiance.", "TransFret : expédition " + e.getId() + " livrée à " + e.getVilleArrivee());
+        notificateur.notifier(e.getClient(), "Votre expédition " + e.getId() + " est livrée", "Votre expédition est arrivée à " + e.getVilleArrivee() + ". Merci de votre confiance.", "TransFret : expédition " + e.getId() + " livrée à " + e.getVilleArrivee());
 
         return true;
     }
@@ -327,7 +247,7 @@ public class ServiceExpedition {
         libererVehicule(e);
         db.mettreAJourStatut(e);
 
-        notifier(e.getClient(), "Annulation de votre expédition " + e.getId(), "Votre expédition a été annulée. Frais d'annulation : " + e.getFraisAnnulation() + " €", "TransFret : expédition " + e.getId() + " annulée");
+        notificateur.notifier(e.getClient(), "Annulation de votre expédition " + e.getId(), "Votre expédition a été annulée. Frais d'annulation : " + e.getFraisAnnulation() + " €", "TransFret : expédition " + e.getId() + " annulée");
 
         return true;
     }
@@ -341,15 +261,4 @@ public class ServiceExpedition {
         e.getVehicule().setDisponible(true);
     }
 
-    private void notifier(Client client, String sujet, String corps, String sms) {
-
-        EmailService.envoyer(client.getEmail(), sujet, corps);
-
-        if (TypeClient.PREMIUM.name().equals(client.getType())) {
-            new SmsService().envoyerSms(
-                    client.getTelephone(),
-                    sms
-            );
-        }
-    }
 }
