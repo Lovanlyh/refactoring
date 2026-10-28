@@ -11,11 +11,11 @@ public class ServiceClient {
             System.out.println("ERREUR : email invalide (" + email + ")");
             return null;
         }
-        if (!type.equals("PARTICULIER") && !type.equals("ENTREPRISE") && !type.equals("PREMIUM")) {
+        if (!TypeClient.PARTICULIER.name().equals(type) && !TypeClient.ENTREPRISE.name().equals(type) && !TypeClient.PREMIUM.name().equals(type)) {
             System.out.println("ERREUR : type de client inconnu");
             return null;
         }
-        if (type.equals("ENTREPRISE") && (siret == null || siret.length() != 14)) {
+            if (TypeClient.ENTREPRISE.name().equals(type) && (siret == null || siret.length() != 14)) {
             System.out.println("ERREUR : SIRET obligatoire (14 chiffres) pour une entreprise");
             return null;
         }

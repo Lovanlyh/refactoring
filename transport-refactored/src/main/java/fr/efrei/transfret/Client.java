@@ -8,20 +8,27 @@ public class Client {
     private String email;
     private String telephone;
     private String adresse;
-    private String type; // "PARTICULIER", "ENTREPRISE" ou "PREMIUM"
-    private String siret; // seulement pour les entreprises (null sinon)
+
+    private TypeClient type;
+
+    private String siret;
+
     private int nbExpeditions;
     private Date dateInscription;
 
     public Client() {
     }
 
-    public Client(String nom, String email, String telephone, String adresse, String type, String siret) {
+    public Client(String nom, String email, String telephone,
+                  String adresse, String type, String siret) {
+
         this.nom = nom;
         this.email = email;
         this.telephone = telephone;
         this.adresse = adresse;
-        this.type = type;
+
+        this.type = type == null ? null : TypeClient.valueOf(type);
+
         this.siret = siret;
         this.nbExpeditions = 0;
         this.dateInscription = new Date();
@@ -60,10 +67,18 @@ public class Client {
     }
 
     public String getType() {
+        return type == null ? null : type.name();
+    }
+
+    public TypeClient getTypeClient() {
         return type;
     }
 
     public void setType(String type) {
+        this.type = type == null ? null : TypeClient.valueOf(type);
+    }
+
+    public void setTypeClient(TypeClient type) {
         this.type = type;
     }
 
@@ -87,7 +102,8 @@ public class Client {
         return dateInscription;
     }
 
+    @Override
     public String toString() {
-        return nom + " (" + type + ")";
+        return nom + " (" + getType() + ")";
     }
 }

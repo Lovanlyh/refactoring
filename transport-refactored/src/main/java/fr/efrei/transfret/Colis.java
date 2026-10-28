@@ -12,7 +12,7 @@ public class Colis {
     private double longueur;     // en cm
     private double largeur;      // en cm
     private double hauteur;      // en cm
-    private int type;            // 0 = standard, 1 = fragile, 2 = dangereux, 3 = refrigere
+    private TypeMarchandise type;           // 0 = standard, 1 = fragile, 2 = dangereux, 3 = refrigere
     private double valeurDeclaree;
 
     public Colis(String description, double poids, double longueur, double largeur, double hauteur, int type, double valeurDeclaree) {
@@ -21,7 +21,7 @@ public class Colis {
         this.longueur = longueur;
         this.largeur = largeur;
         this.hauteur = hauteur;
-        this.type = type;
+        this.type = TypeMarchandise.depuisCode(type);
         this.valeurDeclaree = valeurDeclaree;
     }
 
@@ -31,18 +31,11 @@ public class Colis {
     }
 
     public String getLibelleType() {
-        switch (type) {
-            case 0:
-                return "Standard";
-            case 1:
-                return "Fragile";
-            case 2:
-                return "Dangereux";
-            case 3:
-                return "Réfrigéré";
-            default:
-                return "Inconnu";
-        }
+        return type.getLibelle();
+    }
+
+    public TypeMarchandise getTypeMarchandise() {
+        return type;
     }
 
     public String getDescription() {
@@ -86,11 +79,11 @@ public class Colis {
     }
 
     public int getType() {
-        return type;
+        return type.getCode();
     }
 
     public void setType(int type) {
-        this.type = type;
+        this.type = TypeMarchandise.depuisCode(type);
     }
 
     public double getValeurDeclaree() {

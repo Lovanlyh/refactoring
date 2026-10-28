@@ -12,10 +12,10 @@ public class Expedition {
     private String villeDepart;
     private String villeArrivee;
     private int distance;
-    private String mode;
+    private ModeTransport mode;
     private boolean urgent;
     private boolean assurance;
-    private String statut;
+    private StatutExpedition statut;
     private Date dateCreation;
     private Date dateLivraisonPrevue;
     private Vehicule vehicule;
@@ -57,19 +57,19 @@ public class Expedition {
         sb.append("Facture n° F-" + id + "\n");
         sb.append("Date : " + Utils.formaterDate(new Date()) + "\n");
         sb.append("Client : " + client.getNom() + "\n");
-        if (client.getType().equals("ENTREPRISE")) {
+        if (TypeClient.ENTREPRISE.name().equals(client.getType())) {
             sb.append("SIRET : " + client.getSiret() + "\n");
         }
         sb.append("Adresse : " + client.getAdresse() + "\n");
         sb.append("----------------------------------------------\n");
         sb.append("Trajet : " + villeDepart + " -> " + villeArrivee + " (" + distance + " km)\n");
-        sb.append("Mode : " + mode + (urgent ? " (URGENT)" : "") + "\n");
+        sb.append("Mode : " + getMode() + (urgent ? " (URGENT)" : "") + "\n");
         sb.append("Colis :\n");
         for (Colis c : colis) {
             sb.append("  - " + c.getDescription() + " : " + c.getPoids() + " kg [" + c.getLibelleType() + "]\n");
         }
         sb.append("----------------------------------------------\n");
-        if (statut.equals("ANNULEE")) {
+        if (statut == StatutExpedition.ANNULEE) {
             sb.append("EXPEDITION ANNULEE\n");
             sb.append("Frais d'annulation TTC : " + String.format("%.2f", fraisAnnulation) + " €\n");
         } else {
@@ -130,10 +130,21 @@ public class Expedition {
     }
 
     public String getMode() {
+
+        return mode == null ? null : mode.name();
+    }
+
+    public ModeTransport getModeTransport() {
         return mode;
     }
 
     public void setMode(String mode) {
+        this.mode = mode == null
+                ? null
+                : ModeTransport.valueOf(mode);
+    }
+
+    public void setModeTransport(ModeTransport mode) {
         this.mode = mode;
     }
 
@@ -153,13 +164,25 @@ public class Expedition {
         this.assurance = assurance;
     }
 
+
     public String getStatut() {
+        return statut == null ? null : statut.name();
+    }
+
+    public StatutExpedition getStatutExpedition() {
         return statut;
     }
 
     public void setStatut(String statut) {
+        this.statut = statut == null
+                ? null
+                : StatutExpedition.valueOf(statut);
+    }
+
+    public void setStatutExpedition(StatutExpedition statut) {
         this.statut = statut;
     }
+
 
     public Date getDateCreation() {
         return dateCreation;

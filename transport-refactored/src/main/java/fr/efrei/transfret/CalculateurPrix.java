@@ -1,68 +1,117 @@
+
 package fr.efrei.transfret;
 
 import java.util.List;
 
 public class CalculateurPrix {
 
-    public double calculerPrixHT(List<Colis> colis, int distance, String mode, boolean urgent, boolean assurance, String typeClient) {
+    private static final double ROUTE_PAR_KM = 1.2;
+    private static final double ROUTE_PAR_KG = 0.10;
+    private static final double RAIL_PAR_KM = 0.8;
+    private static final double RAIL_PAR_KG = 0.07;
+    private static final double RAIL_MINIMUM = 150;
+    private static final double MER_PAR_KM = 0.5;
+    private static final double MER_PAR_KG = 0.03;
+    private static final double MER_MINIMUM = 500;
+    private static final double AIR_PAR_KM = 0.6;
+    private static final double AIR_PAR_KG = 4.5;
+    private static final double AIR_POIDS_VOLUMETRIQUE = 167;
+
+    private static final double MAJORATION_FRAGILE = 1.15;
+    private static final double MAJORATION_DANGEREUX = 1.30;
+    private static final double MAJORATION_REFRIGERE = 1.20;
+    private static final double MAJORATION_URGENT = 1.50;
+
+    private static final double SEUIL_ENTREPRISE = 5000;
+    private static final double REMISE_ENTREPRISE = 0.90;
+    private static final double REMISE_ENTREPRISE_IMPORTANTE = 0.85;
+    private static final double REMISE_PREMIUM = 0.80;
+
+    private static final double TAUX_ASSURANCE = 0.02;
+    private static final double ASSURANCE_MINIMUM = 15;
+
+    public double calculerPrixHT(
+            List<Colis> colis,
+            int distance,
+            String mode,
+            boolean urgent,
+            boolean assurance,
+            String typeClient) {
+
+        ModeTransport modeTransport = ModeTransport.valueOf(mode);
+        TypeClient categorieClient = TypeClient.valueOf(typeClient);
+
         double poids = 0;
         double volume = 0;
         double valeur = 0;
+
         boolean fragile = false;
         boolean dangereux = false;
         boolean refrigere = false;
+
         for (Colis c : colis) {
-            poids = poids + c.getPoids();
-            volume = volume + c.getVolume();
-            valeur = valeur + c.getValeurDeclaree();
-            if (c.getType() == 1) fragile = true;
-            if (c.getType() == 2) dangereux = true;
-            if (c.getType() == 3) refrigere = true;
+            poids += c.getPoids();
+            volume += c.getVolume();
+            valeur += c.getValeurDeclaree();
+
+            TypeMarchandise type = c.getTypeMarchandise();
+
+            if (type == TypeMarchandise.FRAGILE) fragile = true;
+            if (type == TypeMarchandise.DANGEREUX) dangereux = true;
+            if (type == TypeMarchandise.REFRIGERE) refrigere = true;
         }
 
-        // tarif de base selon le mode
         double prix;
-        if (mode.equals("ROUTE")) {
-            prix = distance * 1.2 + poids * 0.10;
-        } else if (mode.equals("RAIL")) {
-            prix = distance * 0.8 + poids * 0.07;
-            if (prix < 150) prix = 150;
-        } else if (mode.equals("MER")) {
-            prix = distance * 0.5 + poids * 0.03;
-            if (prix < 500) prix = 500;
-        } else if (mode.equals("AIR")) {
-            double poidsTaxable = poids;
-            if (volume * 167 > poids) {
-                poidsTaxable = volume * 167;
+
+        switch (modeTransport) {
+            case ROUTE -> prix =
+                    distance * ROUTE_PAR_KM + poids * ROUTE_PAR_KG;
+
+            case RAIL -> prix = Math.max(
+                    RAIL_MINIMUM,
+                    distance * RAIL_PAR_KM + poids * RAIL_PAR_KG
+            );
+
+            case MER -> prix = Math.max(
+                    MER_MINIMUM,
+                    distance * MER_PAR_KM + poids * MER_PAR_KG
+            );
+
+            case AIR -> {
+                double poidsTaxable = Math.max(
+                        poids,
+                        volume * AIR_POIDS_VOLUMETRIQUE
+                );
+                prix = distance * AIR_PAR_KM
+                        + poidsTaxable * AIR_PAR_KG;
             }
-            prix = distance * 0.6 + poidsTaxable * 4.5;
-        } else {
-            throw new IllegalArgumentException("Mode inconnu : " + mode);
+
+            default -> throw new IllegalArgumentException(
+                    "Mode inconnu : " + mode
+            );
         }
 
-        // suppléments
-        if (fragile) prix = prix * 1.15;
-        if (dangereux) prix = prix * 1.30;
-        if (refrigere) prix = prix * 1.20;
-        if (urgent) prix = prix * 1.5;
+        if (fragile) prix *= MAJORATION_FRAGILE;
+        if (dangereux) prix *= MAJORATION_DANGEREUX;
+        if (refrigere) prix *= MAJORATION_REFRIGERE;
+        if (urgent) prix *= MAJORATION_URGENT;
 
-        // remise client
-        if (typeClient.equals("ENTREPRISE")) {
-            if (prix > 5000) {
-                prix = prix * 0.85;
-            } else {
-                prix = prix * 0.90;
-            }
-        } else if (typeClient.equals("PREMIUM")) {
-            prix = prix * 0.80;
+        if (categorieClient == TypeClient.ENTREPRISE) {
+            prix *= prix > SEUIL_ENTREPRISE
+                    ? REMISE_ENTREPRISE_IMPORTANTE
+                    : REMISE_ENTREPRISE;
+        } else if (categorieClient == TypeClient.PREMIUM) {
+            prix *= REMISE_PREMIUM;
         }
 
-        // assurance
         if (assurance) {
-            double montantAssurance = valeur * 0.02;
-            if (montantAssurance < 15) montantAssurance = 15;
-            prix = prix + montantAssurance;
+            double montantAssurance = Math.max(
+                    ASSURANCE_MINIMUM,
+                    valeur * TAUX_ASSURANCE
+            );
+            prix += montantAssurance;
         }
-        return Math.round(prix * 100.0) / 100.0;
+
+        return Utils.arrondir(prix);
     }
 }
