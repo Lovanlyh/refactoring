@@ -34,19 +34,33 @@ public class ServiceExpedition {
     private static final int ALTITUDE_VOL_AVION = 35000;
     private static final int TEMPERATURE_REFRIGERATION = 4;
 
-    private Database db = Database.getInstance();
-    private CalculateurPrix calculateur = new CalculateurPrix();
-    private AffectationVehicule affectation = new AffectationVehicule();
+    private final ExpeditionRepository db;
+    private final CalculateurPrix calculateur;
+    private final AffectationVehicule affectation;
+    private final EstimateurDelai estimateurDelai;
+    private final ValidateurExpedition validateur;
+    private final Notificateur notificateur;
 
-    private final EstimateurDelai estimateurDelai = new EstimateurDelai();
-    private final ValidateurExpedition validateur = new ValidateurExpedition();
-    private final Notificateur notificateur = new Notificateur();
+
+    public ServiceExpedition(ExpeditionRepository db, CalculateurPrix calculateur, AffectationVehicule affectation, EstimateurDelai estimateurDelai, ValidateurExpedition validateur, Notificateur notificateur) {
+
+        this.db = db;
+        this.calculateur = calculateur;
+        this.affectation = affectation;
+        this.estimateurDelai = estimateurDelai;
+        this.validateur = validateur;
+        this.notificateur = notificateur;
+    }
+
+    public ServiceExpedition() {
+        this(new DatabaseExpeditionRepository(), new CalculateurPrix(), new AffectationVehicule(), new EstimateurDelai(), new ValidateurExpedition(), new Notificateur());
+    }
+
 
     public Expedition creerExpedition(
             Client client, List<Colis> colis, String villeDepart, String villeArrivee, String mode, boolean urgent, boolean assurance)
     {
 
-        // Préserver l'ordre historique des vérifications.
         if (client == null || colis == null || colis.isEmpty()) {
             if (!validateur.valider(client, colis, null, urgent)) {
                 return null;
