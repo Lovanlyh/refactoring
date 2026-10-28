@@ -1,3 +1,4 @@
+
 package fr.efrei.transfret;
 
 import java.util.EnumMap;
@@ -6,18 +7,10 @@ import java.util.Map;
 
 public class CalculateurPrix {
 
-    private static final double MAJORATION_FRAGILE = 1.15;
-    private static final double MAJORATION_DANGEREUX = 1.30;
-    private static final double MAJORATION_REFRIGERE = 1.20;
-    private static final double MAJORATION_URGENT = 1.50;
-
     private static final double SEUIL_ENTREPRISE = 5000;
     private static final double REMISE_ENTREPRISE = 0.90;
     private static final double REMISE_ENTREPRISE_IMPORTANTE = 0.85;
     private static final double REMISE_PREMIUM = 0.80;
-
-    private static final double TAUX_ASSURANCE = 0.02;
-    private static final double ASSURANCE_MINIMUM = 15;
 
     private final Map<ModeTransport, StrategieTarification> strategies;
 
@@ -39,17 +32,16 @@ public class CalculateurPrix {
         ModeTransport modeTransport = ModeTransport.valueOf(mode);
         TypeClient categorieClient = TypeClient.valueOf(typeClient);
 
-        double valeur = 0;
-
         boolean fragile = false;
         boolean dangereux = false;
         boolean refrigere = false;
+        double valeurDeclaree = 0;
 
-        for (Colis c : colis) {
+        for (Colis colisCourant : colis) {
 
-            valeur += c.getValeurDeclaree();
+            valeurDeclaree += colisCourant.getValeurDeclaree();
 
-            TypeMarchandise type = c.getTypeMarchandise();
+            TypeMarchandise type = colisCourant.getTypeMarchandise();
 
             if (type == TypeMarchandise.FRAGILE) {
                 fragile = true;
@@ -64,7 +56,8 @@ public class CalculateurPrix {
             }
         }
 
-        StrategieTarification strategie = strategies.get(modeTransport);
+        StrategieTarification strategie =
+                strategies.get(modeTransport);
 
         if (strategie == null) {
             throw new IllegalArgumentException(
@@ -72,32 +65,29 @@ public class CalculateurPrix {
             );
         }
 
-        double prix = strategie.calculerTarifBase(
-                colis,
-                distance
-        );
+        CalculPrix calcul = new PrixBase(strategie, colis, distance);
 
         if (fragile) {
-            prix *= MAJORATION_FRAGILE;
+            calcul = new SupplementFragile(calcul);
         }
 
         if (dangereux) {
-            prix *= MAJORATION_DANGEREUX;
+            calcul = new SupplementDangereux(calcul);
         }
 
         if (refrigere) {
-            prix *= MAJORATION_REFRIGERE;
+            calcul = new SupplementRefrigere(calcul);
         }
 
         if (urgent) {
-            prix *= MAJORATION_URGENT;
+            calcul = new SupplementUrgent(calcul);
         }
+
+        double prix = calcul.calculer();
 
         if (categorieClient == TypeClient.ENTREPRISE) {
 
-            prix *= prix > SEUIL_ENTREPRISE
-                    ? REMISE_ENTREPRISE_IMPORTANTE
-                    : REMISE_ENTREPRISE;
+            prix *= prix > SEUIL_ENTREPRISE ? REMISE_ENTREPRISE_IMPORTANTE : REMISE_ENTREPRISE;
 
         } else if (categorieClient == TypeClient.PREMIUM) {
 
@@ -106,9 +96,13 @@ public class CalculateurPrix {
 
         if (assurance) {
 
-            double montantAssurance = Math.max(ASSURANCE_MINIMUM, valeur * TAUX_ASSURANCE);
+            final double prixApresRemise = prix;
+            final double valeurTotaleDeclaree = valeurDeclaree;
 
-            prix += montantAssurance;
+            CalculPrix prixAvecAssurance =
+                    new SupplementAssurance(() -> prixApresRemise, valeurTotaleDeclaree);
+
+            prix = prixAvecAssurance.calculer();
         }
 
         return Utils.arrondir(prix);
